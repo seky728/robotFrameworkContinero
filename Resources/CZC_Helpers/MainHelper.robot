@@ -5,8 +5,7 @@ Library  Collections
 
 
 *** Variables ***
-${price01Product}  0
-${price02Product}  0
+@{prices}
 
 
 
@@ -38,65 +37,48 @@ Select Category Most Expensive From List Main Menu
     Click Link  Nejdražší
 
 Check If Sorting Is Ok
-# Vhodné by bylo samozřejmě toto nahradit polem, nebo nějakym listem co by bralo jako vstupní argument počet produktů a nebyly na pevno dány takto 3
+    [Arguments]  ${numOfProducts}
+    ${products} =  Create List
     Sleep  1s
-    ${price01Product} =  Get Text  css:#tiles > div:nth-child(1) .price .price-vatin
-    ${price02Product} =  Get Text  css:#tiles > div:nth-child(3) .price .price-vatin
-    ${price03Product} =  Get Text  css:#tiles > div:nth-child(5) .price .price-vatin
-    Log To Console  ${Price01Product}
-    Log To Console  ${Price02Product}
-    Log To Console  ${Price03Product}
-    ${Price01Product} =  Split String  ${Price01Product}  Kč
-    ${Price02Product} =  Split String  ${Price02Product}  Kč
-    ${Price03Product} =  Split String  ${Price03Product}  Kč
+    FOR  ${num}  IN  ${numOfProducts}
+        ${price} =  Get Price Of N Position Product  ${num}
+
+        Append To List  ${products}  ${price}
+
+    END
+
+    ${sortedList} =  Evaluate  sorted(${products}, key = int, reverse=True)
+
+    Lists Should Be Equal  ${products}  ${sortedList}
 
 
-    ${Price01Product} =  Get From List  ${Price01Product}  0
-    ${Price02Product} =  Get From List  ${Price02Product}  0
-    ${Price03Product} =  Get From List  ${Price03Product}  0
-
-    ${Price01Product} =  Convert To Integer  ${Price01Product}
-    ${Price02Product} =  Convert To Integer  ${Price02Product}
-    ${Price03Product} =  Convert To Integer  ${Price03Product}
-
-    Log To Console  ${Price01Product}
-    Log To Console  ${Price02Product}
-    Log To Console  ${Price03Product}
-
-    Should Be True  ${Price01Product} > ${Price02Product} > ${Price03Product}
+User Save Price Of N Product
+    [Arguments]  ${nProduct}
+    ${price} =  Get Price Of N Position Product  ${nProduct}
+    Append To List  ${prices}  ${price}
 
 
-User Save Price Of 1st Product
-#zde také by bylo vhodné nahradit metodou, která by jako vstupní argument přijala z kolikátého produktu chci částku načíst
-    ${price01Product} =  Get Text  css:#tiles > div:nth-child(1) .price .price-vatin
-    ${Price01Product} =  Split String  ${Price01Product}  Kč
-    ${Price01Product} =  Get From List  ${Price01Product}  0
-    ${Price01Product} =  Convert To Integer  ${Price01Product}
-    Set Global Variable  ${price01Product}   ${price01Product}
-
-
-User Save Price Of 2nd Product
-    ${price02Product} =  Get Text  css:#tiles > div:nth-child(3) .price .price-vatin
-    ${Price02Product} =  Split String  ${Price02Product}  Kč
-    ${Price02Product} =  Get From List  ${Price02Product}  0
-    ${Price02Product} =  Convert To Integer  ${Price02Product}
-    Set Global Variable  ${price02Product}   ${price02Product}
+Get Price Of N Position Product
+    [Arguments]  ${nProduct}
+    IF  ${nProduct} > 1
+        ${nProduct} =  Evaluate  ${nProduct} + 1
+    END
+    ${price} =  Get Text  css:#tiles > div:nth-child(${nProduct}) .price .price-vatin
+    ${price} =  Split String  ${price}  Kč
+    ${price} =  Get From List  ${price}  0
+    ${price} =  Convert To Integer  ${price}
+    [Return]  ${price}
 
 
 
+Add Product Into Cart
+    [Arguments]  ${nProduct}
+    IF  ${nProduct} > 1
+        ${nProduct} =  Evaluate  ${nProduct} + 1
+    END
 
-
-Add First Product Into Cart
-#tady také, nahradit metodou se vstupním argumentem pro nth-child
-    Scroll Element Into View  css:#tiles > div:nth-child(1) button
-    Click Button  css:#tiles > div:nth-child(1) button
-
-
-
-
-Add Second Product Into Cart
-    Click Button  css:#tiles > div:nth-child(3) button
-
+    Scroll Element Into View  css:#tiles > div:nth-child(${nProduct}) button
+    Click Button  css:#tiles > div:nth-child(${nProduct}) button
 
 
 Check Price In Cart
@@ -107,9 +89,11 @@ Check Price In Cart
     ${cartPrice} =  Split String  ${cartPrice}  Kč
     ${cartPrice} =  Get From List  ${cartPrice}  0
     ${cartPrice} =  Convert To Integer  ${cartPrice}
-    ${countCurrentProducts} =  Evaluate  ${price01Product} + ${price02Product}
-    Log To Console  ${countCurrentProducts}
-    Should Be True  ${cartPrice} == ${countCurrentProducts}
+
+    Log To Console  this is prices: ${prices}
+    ${countSavedPrices} =  Sum List Values  ${prices}
+    Log To Console  ${countSavedPrices}
+    Should Be True  ${cartPrice} == ${countSavedPrices}
 
 
 Continue In Shopping
@@ -123,3 +107,20 @@ Continue Into Order
 
 User Is In Cart
     Element Should Contain  css:#basket-visibility-container h1  Váš nákupní košík
+
+Sum List Values
+    [arguments]   ${list}
+    ${listLength} =  Get Length  ${list}
+    ${value} =  Set Variable  0
+    IF  ${listLength} <= 1
+        ${value} =  Get From List  ${list}  0
+    ELSE
+
+        FOR  ${num}  IN RANGE  ${listLength}
+            ${listValue} =  Get From List  ${list}  ${num}
+            ${value} =  Evaluate  ${value} + ${listValue}
+        END
+
+    END
+
+    [Return]  ${value}
